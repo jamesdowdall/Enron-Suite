@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-#Run this from the top level directory (maildir)
 import os #import os module as it makes it easy to taverse dir structure
 import collections
 
@@ -23,14 +22,8 @@ def setNumberOfEmailsInFolder(folderName, numberOfEmails):
   dictionaryOfFolders[folderName][1] = numberOfEmails
   return
 
-#Initialise folder method?
-
-#TODO: Change data structure of dictionaryOfFolders from folderName > frequency, to Folder Name - [Frequency of folder, Number of Emails in that folder]
-
 i = 0
-emails = 0
-for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Base Enron Email Dataset/maildir"):#,topdown=False):
-  emails = emails + len(files)
+for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Edited Enron Email Dataset/maildir"):#,topdown=False):
   if i == 0:
     listOfEmployees = dirs #Dirty way of capturing employees. 
 
@@ -40,6 +33,7 @@ for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Base
 
   if len(files) > 0:
     folder = str(root.rpartition("/")[-1]) #folder name by parsing root
+    
     if folder in dictionaryOfFolders:
       setFrequencyOfFolder(folder,getFrequencyOfFolder(folder)+1)
       setNumberOfEmailsInFolder(folder,getNumberOfEmailsInFolder(folder)+len(files))
@@ -51,9 +45,6 @@ for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Base
 for employee in listOfEmployees:
   if employee in dictionaryOfFolders:
     del dictionaryOfFolders[employee] #Could just del, but that would throw an error, will avoid.
-
-print "Number of Emails:"
-print emails
 
 print "Number of Emails Added:"
 print numberOfEmailsAdded
