@@ -32,7 +32,7 @@ for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Edit
 			print "Creating dir in: " + root
 		pathsOfEmailsToBeMoved.append(root+"/_sent_mail")
 
-	elif ("sent" in dirs): 		#Covers case when only sent is present (as AND case will have entered if both are present)
+	elif ("sent" in dirs): 			#Covers case when only sent is present (as AND case will have entered if both are present)
 		if "sent_mail" not in dirs:	#Addresses case when _sent_mail is not present
 			os.mkdir(root+"/sent_mail")
 			print "Creating dir in: " + root
@@ -74,8 +74,36 @@ for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Edit
 		# 	os.renames(old,new)
 		# 	sent_renames = sent_renames + 1
 
-print "Completed."
-print "Paths of Emails to be Renamed:"
-print pathsofEmailsToBeRenamed
+#print "Paths of Emails to be Renamed prior to renaming:"
+#print pathsofEmailsToBeRenamed
+
+print "Length of Paths of Emails to be Renamed: " + str(len(pathsofEmailsToBeRenamed))
+print "Length of Paths of Emails to be Moved prior to renaming: " + str(len(pathsOfEmailsToBeMoved))
+
+for folders in pathsofEmailsToBeRenamed:
+	files = os.listdir(folders)
+	folderName = str(folders.rpartition("/")[-1]) #folder name by parsing root
+	for email in files:
+		if (folderName == "_sent_mail"):
+			oldName = folders + "/" + email
+			newName = folders + "/A" + email
+			os.rename(oldName,newName)
+		
+		elif (folderName == "sent"):
+			oldName = folders + "/" + email
+			newName = folders + "/B" + email
+			os.rename(oldName,newName)
+		
+		else:
+			print "folderName not recognised: " + folderName
+
+	pathsOfEmailsToBeMoved.append(folders)
+	#pathsofEmailsToBeRenamed.remove(folders)
+
+#print "Paths of Emails to be Renamed post renaming:"
+#print pathsofEmailsToBeRenamed
+
+print "Length of Paths of Emails to be Moved post renaming: " + str(len(pathsOfEmailsToBeMoved))
+
 print "Paths of Emails to be Moved:"
 print pathsOfEmailsToBeMoved
