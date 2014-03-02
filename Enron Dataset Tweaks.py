@@ -4,7 +4,7 @@ import os.path
 import shutil
 
 pathsOfEmailsToBeMoved = []
-pathsofEmailsToBeRenamed = []
+pathsOfEmailsToBeRenamed = []
 
 i = 0
 for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Edited Enron Email Dataset/maildir"):
@@ -12,30 +12,28 @@ for root, dirs, files in os.walk("/Users/James/Documents/Enron Email Corpus/Edit
 	if i%100 == 0:
 		print i
 
-	#Deal with sent_items case
+	foldersAdded = 0	
 
-	if ("_sent_mail" in dirs) and ("sent" in dirs): #Covers case if both present
-		if "sent_mail" not in dirs:
-			os.mkdir(root+"/sent_mail")
-		pathsofEmailsToBeRenamed.append(root+"/_sent_mail")
-		pathsofEmailsToBeRenamed.append(root+"/sent")
+	if ("sent_items" in dirs):
+		pathsOfEmailsToBeRenamed.append(root+"/sent_items")
+		foldersAdded = foldersAdded + 1
 
-	elif ("_sent_mail" in dirs):	#Covers case when only _sent_mail is present (as AND case will have entered if both are present)
-		if "sent_mail" not in dirs:	#Addresses case when _sent_mail is not present
-			os.mkdir(root+"/sent_mail")
-		pathsOfEmailsToBeMoved.append(root+"/_sent_mail")
+	if ("_sent_mail" in dirs):
+		pathsOfEmailsToBeRenamed.append(root+"/_sent_mail")
+		foldersAdded = foldersAdded + 1
 
-	elif ("sent" in dirs): 			#Covers case when only sent is present (as AND case will have entered if both are present)
-		if "sent_mail" not in dirs:	#Addresses case when _sent_mail is not present
-			os.mkdir(root+"/sent_mail")
-		pathsOfEmailsToBeMoved.append(root+"/sent")
+	if ("sent" in dirs):
+		pathsOfEmailsToBeRenamed.append(root+"/sent")
+		foldersAdded = foldersAdded + 1
 
+	if "sent_mail" not in dirs and foldersAdded > 0:
+		os.mkdir(root+"/sent_mail")
 
-print "Length of Paths of Emails to be Renamed: " + str(len(pathsofEmailsToBeRenamed))
+print "Length of Paths of Emails to be Renamed: " + str(len(pathsOfEmailsToBeRenamed))
 print "Length of Paths of Emails to be Moved prior to renaming: " + str(len(pathsOfEmailsToBeMoved))
 
 #Rename files in cases where there are several folders, add paths to list of files to be moved
-for folders in pathsofEmailsToBeRenamed:
+for folders in pathsOfEmailsToBeRenamed:
 	files = os.listdir(folders)
 	folderName = str(folders.rpartition("/")[-1]) #folder name by parsing root
 	for email in files:
@@ -47,6 +45,11 @@ for folders in pathsofEmailsToBeRenamed:
 		elif (folderName == "sent"):
 			oldName = folders + "/" + email
 			newName = folders + "/B" + email
+			os.rename(oldName,newName)
+
+		elif (folderName == "sent_items"):
+			oldName = folders + "/" + email
+			newName = folders + "/C" + email
 			os.rename(oldName,newName)
 		
 		else:
