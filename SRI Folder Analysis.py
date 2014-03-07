@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os #import os module as it makes it easy to taverse dir structure
+import os #import os module as it makes it easy to traverse dir structure
 import collections
 
 dictionaryOfFolders = {} #Unsorted dictionary
