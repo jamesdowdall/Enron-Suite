@@ -4,8 +4,12 @@ import os
 import csv
 import string
 import EmailParser
+import sqlite3
+import json
+import os.path
 
 __CATEGORIESLOCATION__ = "/Users/James/Documents/Enron Email Corpus/enron_with_categories"
+__CATEGORYMAPPINGLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/IDCategoryMapping.txt"
 
 def parseCats(location):
 	try:
@@ -64,7 +68,6 @@ def calculateSubjectiveImportance(categories):
 	return importanceRating/numberOfRatings
 
 def getImportanceRating(categoryID):
-	
 	subjectiveImportanceRatings = {
 	#Strong Positive Correlation - 1
 	'1.5' : 1, '1.6' : 1, '2.6' : 1, '2.8' : 1, '3.1' : 1, '3.2' : 1, '3.5' : 1, '3.6' : 1, '3.10' : 1,
@@ -86,11 +89,20 @@ def getImportanceRating(categoryID):
 	else:
 		return float(subjectiveImportanceRatings[categoryID])
 
+def generateCategoriesJSON(IDImportanceMappings):
+	try:
+		mappings = open(__CATEGORYMAPPINGLOCATION__,'w')
+	except IOError:
+		print "Failed to open mappings"
+	json.dump(IDImportanceMappings,mappings)
+	mappings.close()
+
 
 if __name__ == "__main__":
 	i = 0
 	initialiseCSV()
-	for root, dirs, files in os.walk(__DIRLOCATION__):
+	messageIDMappings = {}
+	for root, dirs, files in os.walk(__CATEGORIESLOCATION__):
 		if len(files) > 0:
 			filenames = os.listdir(root)
 			
@@ -101,7 +113,7 @@ if __name__ == "__main__":
 			
 			for names in filenames:
 				i = i+1
-				if i%300 == 0: #No of files processed
+				if i%10 == 0: #No of files processed
 					print i
 
 				filePath = root + "/" + names
@@ -113,6 +125,9 @@ if __name__ == "__main__":
 				data = EmailParser.parseEmail(filePath)
 				processedData = EmailParser.processData(data)
 
+				messageID = processedData[10]
+				messageIDMappings[messageID] = importanceRating
 				#writeToCSV(i,filePath,processedData,categoryInfo,importanceRating)
 
+	generateCategoriesJSON(messageIDMappings)
 				
