@@ -5,6 +5,7 @@ import os.path
 import csv
 import string
 import sqlite3
+import json
 
 __DATASETLOCATION__ = "/Users/James/Documents/Enron Email Corpus/Edited Enron Email Dataset/maildir/"
 __RESULTLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/"
@@ -14,6 +15,8 @@ __DATABASELOCATION__ = "/Users/James/Documents/Enron Email Corpus/Enron.db"
 
 __CSVHEADERS__ = ["Email_ID","Parent_Folder","User","Date","Subject","Email_From","Email_To","Body","Cc","Bcc","Number_of_Recipients","Length_of_Email_Body","Message_ID"]#,"FilePath"]
 __OUTPUT__ = ""
+
+__CATEGORYMAPPINGLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/IDCategoryMapping.txt"
 
 
 def parseEmail(emailPath):
@@ -50,7 +53,7 @@ def initialiseDatabase():
 
 	database = sqlite3.connect(__DATABASELOCATION__)
 	db = database.cursor()
-	db.execute("CREATE TABLE enron (Email_ID,Parent_Folder,User,Date,Subject,Email_From,Email_To,Body,Cc,Bcc,Number_of_Recipients,Length_of_Email_Body,Message_ID)")
+	db.execute("CREATE TABLE enron (Email_ID INTEGER PRIMARY KEY,Parent_Folder TEXT,User TEXT,Date TEXT,Subject TEXT,Email_From TEXT,Email_To TEXT,Body TEXT,Cc TEXT,Bcc TEXT,Number_of_Recipients INTEGER,Length_of_Email_Body INTEGER,Message_ID TEXT,Subjective_Importance DOUBLE)")
 	database.commit()
 	database.close()
 
@@ -59,10 +62,11 @@ def determineNumberOfRecipients(recipients):
 	# OUTPUT: number of unique recipients
 	parsedRecipients = []
 	for field in recipients:
-		split = string.split(field,',')
-		for potentialRecipient in split:
-			if (potentialRecipient not in parsedRecipients) and (potentialRecipient != ""):
-				parsedRecipients.append(potentialRecipient)
+		if field is not None:
+			split = string.split(field,',')
+			for potentialRecipient in split:
+				if (potentialRecipient not in parsedRecipients) and (potentialRecipient != ""):
+					parsedRecipients.append(potentialRecipient)
 	return len(parsedRecipients)
 
 def prepareDataForWrite(emailId,path,emailData):
@@ -76,7 +80,7 @@ def prepareDataForWrite(emailId,path,emailData):
 	recipients = [emailData[3]] + emailData[5:6]
 	numberOfRecipients = determineNumberOfRecipients(recipients)
 	lengthOfEmail = len(emailData[4])	
-	return [emailId] + [parentFolder] + [user] + emailData[0:7] + [numberOfRecipients] + [lengthOfEmail] + [emailData[10]]
+	return [emailId] + [parentFolder] + [user] + emailData[0:7] + [numberOfRecipients] + [lengthOfEmail] + emailData[10:12]
 
 
 def writeToCSV(emailId,path,emailData):
@@ -119,7 +123,7 @@ def writeToDatabase(emailId,path,emailData):
 
 	preparedData = prepareDataForWrite(emailId,path,emailData)
 	values = tuple(preparedData)
-	db.execute("insert into enron values (?,?,?,?,?,?,?,?,?,?,?,?,?)",values)
+	db.execute("insert into enron values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",values)
 	database.commit()
 	database.close()
 
@@ -130,7 +134,7 @@ def attemptToSet(key,source):
 		headerField = unicode(source[key],'utf-8','replace')
 		return headerField
 	except KeyError:
-		headerField = unicode("",'utf-8','replace')
+		headerField = None #unicode("",'utf-8','replace')
 		return headerField
 
 def processData(headerList):
@@ -150,9 +154,18 @@ def processData(headerList):
 	Bcc = attemptToSet('Bcc',headerList)
 
 	MessageID = attemptToSet('Message-ID',headerList)
+	ImportanceRating = attemptToSet('Importance_Rating',headerList)
 
-	return [Date,Subject,From,To,Body,Cc,Bcc,Re,Origin,Folder,MessageID]
+	return [Date,Subject,From,To,Body,Cc,Bcc,Re,Origin,Folder,MessageID,ImportanceRating]
 
+def loadIDMappings():
+	try:
+		mappings = open(__CATEGORYMAPPINGLOCATION__,'r')
+	except IOError:
+		print "Failed to open mappings"
+	IDtoImportanceMappings = json.load(mappings)
+	mappings.close()
+	return IDtoImportanceMappings
 
 if __name__ == "__main__":
 
@@ -161,6 +174,7 @@ if __name__ == "__main__":
 	else:
 		initialiseDatabase()
 
+	importanceMappings = loadIDMappings()
 	for root, dirs, files in os.walk(__DATASETLOCATION__):
 		if len(files) > 0: #If files actually present
 			for element in files:
@@ -170,9 +184,12 @@ if __name__ == "__main__":
 
 				if emailID%1000 == 0: #No of files processed
 					print emailID
-
 				
 				data = parseEmail(filePath)
+
+				if (data['Message-ID'] in importanceMappings):
+					data['Importance_Rating'] = str(importanceMappings[data['Message-ID']])
+
 				processedData = processData(data)
 
 				if __OUTPUT__ == "CSV":
@@ -180,4 +197,4 @@ if __name__ == "__main__":
 				else:
 					writeToDatabase(emailID,filePath,processedData)
 				
-				#writeBodyToFile(processedData)
+				writeBodyToFile(processedData)
