@@ -5,7 +5,7 @@ import csv
 import string
 import EmailParser
 
-__DIRLOCATION__ = "/Users/James/Documents/Enron Email Corpus/enron_with_categories"
+__CATEGORIESLOCATION__ = "/Users/James/Documents/Enron Email Corpus/enron_with_categories"
 
 def parseCats(location):
 	try:
@@ -87,31 +87,32 @@ def getImportanceRating(categoryID):
 		return float(subjectiveImportanceRatings[categoryID])
 
 
-i = 0
-initialiseCSV()
-for root, dirs, files in os.walk(__DIRLOCATION__):
-	if len(files) > 0:
-		filenames = os.listdir(root)
-		
-		#Remove .cats files from listdir
-		for names in filenames:
-			if (names.split('.')[-1] == 'cats'):
-				filenames.remove(names)
-		
-		for names in filenames:
-			i = i+1
-			if i%300 == 0: #No of files processed
-				print i
-
-			filePath = root + "/" + names
-			catsFile = filePath.split('.')[0] + '.cats'
+if __name__ == "__main__":
+	i = 0
+	initialiseCSV()
+	for root, dirs, files in os.walk(__DIRLOCATION__):
+		if len(files) > 0:
+			filenames = os.listdir(root)
 			
-			categoryInfo = parseCats(catsFile)
-			importanceRating = calculateSubjectiveImportance(categoryInfo)
-
-			data = EmailParser.parseEmail(filePath)
-			processedData = EmailParser.processData(data)
-
-			writeToCSV(i,filePath,processedData,categoryInfo,importanceRating)
-
+			#Remove .cats files from listdir
+			for names in filenames:
+				if (names.split('.')[-1] == 'cats'):
+					filenames.remove(names)
 			
+			for names in filenames:
+				i = i+1
+				if i%300 == 0: #No of files processed
+					print i
+
+				filePath = root + "/" + names
+				catsFile = filePath.split('.')[0] + '.cats'
+				
+				categoryInfo = parseCats(catsFile)
+				importanceRating = calculateSubjectiveImportance(categoryInfo)
+
+				data = EmailParser.parseEmail(filePath)
+				processedData = EmailParser.processData(data)
+
+				#writeToCSV(i,filePath,processedData,categoryInfo,importanceRating)
+
+				
