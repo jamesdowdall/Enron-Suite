@@ -12,7 +12,8 @@ __CSVLOCATION__ = __RESULTLOCATION__ + "EnronData.csv"
 __BODYLOCATION__ = __RESULTLOCATION__ + "EnronBodies.txt"
 __DATABASELOCATION__ = "/Users/James/Documents/Enron Email Corpus/Enron.db"
 
-__CSVHEADERS__ = ["Email_ID","Parent_Folder","User","Date","Subject","Email_From","Email_To","Body","Cc","Bcc","Number_of_Recipients","Attachment","Length_of_Email_Body"]#,"FilePath"]
+__CSVHEADERS__ = ["Email_ID","Parent_Folder","User","Date","Subject","Email_From","Email_To","Body","Cc","Bcc","Number_of_Recipients","Length_of_Email_Body","Message_ID"]#,"FilePath"]
+__OUTPUT__ = ""
 
 
 def parseEmail(emailPath):
@@ -49,7 +50,7 @@ def initialiseDatabase():
 
 	database = sqlite3.connect(__DATABASELOCATION__)
 	db = database.cursor()
-	db.execute("CREATE TABLE enron (Email_ID,Parent_Folder,User,Date,Subject,Email_From,Email_To,Body,Cc,Bcc,Number_of_Recipients,Attachment,Length_of_Email_Body)")
+	db.execute("CREATE TABLE enron (Email_ID,Parent_Folder,User,Date,Subject,Email_From,Email_To,Body,Cc,Bcc,Number_of_Recipients,Length_of_Email_Body,Message_ID)")
 	database.commit()
 	database.close()
 
@@ -65,7 +66,7 @@ def determineNumberOfRecipients(recipients):
 	return len(parsedRecipients)
 
 def prepareDataForWrite(emailId,path,emailData):
-	# Structure of emailData: [Date,Subject,From,To,Body,Cc,Bcc,Attachment,Re,Origin,Folder]
+	# Structure of emailData: [Date,Subject,From,To,Body,Cc,Bcc,Re,Origin,Folder,MessageID]
 
 	#Generated info
 	stub = string.split(path,"/")
@@ -75,7 +76,8 @@ def prepareDataForWrite(emailId,path,emailData):
 	recipients = [emailData[3]] + emailData[5:6]
 	numberOfRecipients = determineNumberOfRecipients(recipients)
 	lengthOfEmail = len(emailData[4])	
-	return [emailId] + [unicode(parentFolder,'utf-8','replace')] + [unicode(user,'utf-8','replace')] + emailData[0:7] + [numberOfRecipients] + [emailData[8]] + [lengthOfEmail]
+	return [emailId] + [parentFolder] + [user] + emailData[0:7] + [numberOfRecipients] + [lengthOfEmail] + [emailData[10]]
+
 
 def writeToCSV(emailId,path,emailData):
 	# INPUT: Unique ID of Email, Location of email, List containing the header values.
@@ -92,7 +94,10 @@ def writeToCSV(emailId,path,emailData):
 		emailData[4] = emailData[4][0:32600]
 
 	preparedData = prepareDataForWrite(emailID,path,emailData)
-	writer.writerow(preparedData)
+	try: 
+		writer.writerow(preparedData)
+	except:
+		print "Could not write email: " + str(emailId)
 	results.close
 
 def writeBodyToFile(headers):
@@ -111,10 +116,6 @@ def writeToDatabase(emailId,path,emailData):
 	# OUTPUT: Writes details to database.
 	database = sqlite3.connect(__DATABASELOCATION__)
 	db = database.cursor()
-
-	#Cutting down overflow of Body length
-	if len(emailData[4]) > 2147483647:
-		emailData[4] = emailData[4][0:2147483647]
 
 	preparedData = prepareDataForWrite(emailId,path,emailData)
 	values = tuple(preparedData)
@@ -147,36 +148,36 @@ def processData(headerList):
 	To = attemptToSet('To',headerList)
 	Cc = attemptToSet('Cc',headerList)
 	Bcc = attemptToSet('Bcc',headerList)
-	Attachment = attemptToSet('X-FileName',headerList)
 
-	# if attemptToSet('X-FileName',headerList) != "":
-	# 	Attachment = True
-	# else:
-	# 	Attachment = False
+	MessageID = attemptToSet('Message-ID',headerList)
 
-	return [Date,Subject,From,To,Body,Cc,Bcc,Attachment,Re,Origin,Folder]
+	return [Date,Subject,From,To,Body,Cc,Bcc,Re,Origin,Folder,MessageID]
 
 
-# collatedHeaders = []
 if __name__ == "__main__":
-	i = 0
-	initialiseCSV()
-	initialiseDatabase()
+
+	if __OUTPUT__ == "CSV":
+		initialiseCSV()
+	else:
+		initialiseDatabase()
+
 	for root, dirs, files in os.walk(__DATASETLOCATION__):
 		if len(files) > 0: #If files actually present
 			for element in files:
-				i = i+1
-				if i%1000 == 0: #No of files processed
-					print i
-
+				
+				emailID = int(element)
 				filePath = root + "/" + element
+
+				if emailID%1000 == 0: #No of files processed
+					print emailID
+
+				
 				data = parseEmail(filePath)
 				processedData = processData(data)
-				writeToDatabase(i,filePath,processedData)
-				#writeToCSV(i,filePath,processedData)
+
+				if __OUTPUT__ == "CSV":
+					writeToCSV(emailID,filePath,processedData)
+				else:
+					writeToDatabase(emailID,filePath,processedData)
+				
 				#writeBodyToFile(processedData)
-	# 			headers = data[0]
-	# 			for header in headers:
-	# 				if header[0] not in collatedHeaders:
-	# 					collatedHeaders.append(header[0])
-	# print collatedHeaders
