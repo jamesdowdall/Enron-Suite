@@ -10,13 +10,14 @@ import json
 __DATASETLOCATION__ = "/Users/James/Documents/Enron Email Corpus/Edited Enron Email Dataset/maildir/"
 __RESULTLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/"
 __CSVLOCATION__ = __RESULTLOCATION__ + "EnronData.csv"
-__BODYLOCATION__ = __RESULTLOCATION__ + "EnronBodies.txt"
+__BODYOUTPUT__ = "/Users/James/Documents/Enron Email Corpus/LIWC/Input/"
 __DATABASELOCATION__ = "/Users/James/Documents/Enron Email Corpus/Enron.db"
 
 __CSVHEADERS__ = ["Email_ID","Parent_Folder","User","Date","Subject","Email_From","Email_To","Body","Cc","Bcc","Number_of_Recipients","Length_of_Email_Body","Message_ID"]#,"FilePath"]
-__OUTPUT__ = ""
+__OUTPUT__ = "LIWC"
 
 __CATEGORYMAPPINGLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/IDCategoryMapping.txt"
+
 
 
 def parseEmail(emailPath):
@@ -82,7 +83,6 @@ def prepareDataForWrite(emailId,path,emailData):
 	lengthOfEmail = len(emailData[4])	
 	return [emailId] + [parentFolder] + [user] + emailData[0:7] + [numberOfRecipients] + [lengthOfEmail] + emailData[10:12]
 
-
 def writeToCSV(emailId,path,emailData):
 	# INPUT: Unique ID of Email, Location of email, List containing the header values.
 	# OUTPUT: Writes details to file.
@@ -104,16 +104,15 @@ def writeToCSV(emailId,path,emailData):
 		print "Could not write email: " + str(emailId)
 	results.close
 
-def writeBodyToFile(headers):
+def writeBodyToFile(emailID,body):
 	# INPUT: Headers list [Date,Subject,From,To,Body,Cc,Bcc,Attachment,Re,Origin,Folder]
 	# OUTPUT: Writes just the body field to the CSV, separated by #SEG#
 	try:
-		bodies = open(__BODYLOCATION__,'a')
+		output = open(__BODYOUTPUT__ + str(emailID),'w')
 	except IOError:
-		print "Failed to open: " + __BODYLOCATION__
-	body = headers[4]
-	bodies.write(body + '#SEG#')
-	bodies.close
+		print "Failed to open: " + __BODYOUTPUT__ + str(emailID)
+	output.write(body)
+	output.close
 
 def writeToDatabase(emailId,path,emailData):
 	# INPUT: Unique ID of Email, Location of email, List containing the header values.
@@ -167,11 +166,17 @@ def loadIDMappings():
 	mappings.close()
 	return IDtoImportanceMappings
 
+def normaliseData(bodylength,noOfRecipients):
+	maxBodyLength = 2011422
+	maxNoOfRecipients = 913
+	return bodylength/maxBodyLength,noOfRecipients/maxNoOfRecipients
+	#Use this
+
 if __name__ == "__main__":
 
 	if __OUTPUT__ == "CSV":
 		initialiseCSV()
-	else:
+	elif __OUTPUT__ == "DATABASE":
 		initialiseDatabase()
 
 	importanceMappings = loadIDMappings()
@@ -194,7 +199,7 @@ if __name__ == "__main__":
 
 				if __OUTPUT__ == "CSV":
 					writeToCSV(emailID,filePath,processedData)
-				else:
+				elif __OUTPUT__ == "DATABASE":
 					writeToDatabase(emailID,filePath,processedData)
-				
-				writeBodyToFile(processedData)
+				elif __OUTPUT__ == "LIWC":
+					writeBodyToFile(emailID,processedData[4])
