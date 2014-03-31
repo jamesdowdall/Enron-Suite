@@ -20,7 +20,8 @@ __DATABASELOCATION__ = "/Users/James/Documents/Enron Email Corpus/Enron.db"
 
 __CSVHEADERS__ = ["Email_ID","Parent_Folder","User","Date","Subject","Email_From","Email_To","Body","Cc","Bcc","Number_of_Recipients","Length_of_Email_Body","Message_ID","Importance_Statement"]#,"FilePath"]
 __LIWCHEADERS__ = ['WC', 'WPS', 'Sixltr', 'Dic', 'Numerals','funct', 'pronoun', 'ppron', 'i', 'we', 'you', 'shehe', 'they', 'ipron', 'article', 'verb', 'auxverb', 'past', 'present', 'future', 'adverb', 'preps', 'conj', 'negate', 'quant', 'number', 'swear', 'social', 'family', 'friend', 'humans', 'affect', 'posemo', 'negemo', 'anx', 'anger', 'sad', 'cogmech', 'insight', 'cause', 'discrep', 'tentat', 'certain', 'inhib', 'incl', 'excl', 'percept', 'see', 'hear', 'feel', 'bio', 'body', 'health', 'sexual', 'ingest', 'relativ', 'motion', 'space', 'time', 'work', 'achieve', 'leisure', 'home', 'money', 'relig', 'death', 'assent', 'nonfl', 'filler','Period', 'Comma', 'Colon', 'SemiC', 'QMark', 'Exclam', 'Dash', 'Quote', 'Apostro', 'Parenth', 'OtherP', 'AllPct']
-__OUTPUT__ = "CSV"
+__WEKAHEADERS__ = ["Email_ID","Importance_Statement","Number_of_Recipients","Length_of_Email_Body"] + __LIWCHEADERS__
+__OUTPUT__ = "WEKA"
 
 __CATEGORYMAPPINGLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/IDCategoryMapping.txt"
 __NORMALISED__ = True
@@ -49,7 +50,10 @@ def initialiseCSV():
 		print "Failed to open csv in: " + __CSVLOCATION__
 
 	writer = csv.writer(results,dialect="excel")
-	writer.writerow(__CSVHEADERS__+__LIWCHEADERS__)
+	if (__OUTPUT__ == "CSV"):
+		writer.writerow(__CSVHEADERS__+__LIWCHEADERS__)
+	elif (__OUTPUT__ == "WEKA"):
+		writer.writerow(__WEKAHEADERS__)
 	results.close()
 
 def initialiseDatabase():
@@ -126,13 +130,19 @@ def writeToCSV(emailId,path,emailData,normalisedData): #This is un-normalised.
 
 	preparedData = prepareDataForWrite(emailID,path,emailData)
 
-	#overwriting Body
-	preparedData[5] = None
-	preparedData[6] = None
-	preparedData[7] = None
-	preparedData[8] = None
-	preparedData[9] = None
+	if (__OUTPUT__ == "CSV"):
+		#overwriting 
+		preparedData[4] = None
+		preparedData[5] = None
+		preparedData[6] = None
+		preparedData[7] = None
+		preparedData[8] = None
+		preparedData[9] = None
 
+	elif (__OUTPUT__ == "WEKA"):
+		#emaildata: [Date,Subject,From,To,Body,Cc,Bcc]
+		preparedData = [preparedData[0]] + [preparedData[-1]] + [preparedData[-5]] + [preparedData[-4]] 
+	
 	sql = loadLIWCData(emailId)
 	if (__NORMALISED__):
 		sql = normaliseData(sql,normalisedData)
@@ -235,7 +245,7 @@ def loadNormalisedData():
 
 if __name__ == "__main__":
 
-	if __OUTPUT__ == "CSV":
+	if (__OUTPUT__ == "CSV") or (__OUTPUT__ == "WEKA"):
 		initialiseCSV()
 	elif __OUTPUT__ == "DATABASE":
 		initialiseDatabase()
@@ -259,7 +269,7 @@ if __name__ == "__main__":
 
 				processedData = processData(data)
 
-				if __OUTPUT__ == "CSV":
+				if (__OUTPUT__ == "CSV") or (__OUTPUT__ == "WEKA"):
 					writeToCSV(emailID,filePath,processedData,minMax)
 				elif __OUTPUT__ == "DATABASE":
 					writeToDatabase(emailID,filePath,processedData,minMax)
