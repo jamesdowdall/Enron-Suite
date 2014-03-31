@@ -99,11 +99,11 @@ def prepareDataForWrite(emailId,path,emailData):
 	else:
 		lengthOfEmail = len(emailData[4])
 
-	if emailData[11] is None:
+	if emailData[11] is None: #This needs to be changed to be more statistically correct.
 		importanceStatement = None
-	elif float(emailData[11]) < 0.5:
+	elif float(emailData[11]) < 0.76:
 		importanceStatement = "Non Important"
-	elif float(emailData[11]) >= 0.75:
+	elif float(emailData[11]) >= 0.76:
 		importanceStatement = "Important"
 	else:
 		importanceStatement = "Neutrally Important"
@@ -117,6 +117,10 @@ def normaliseData(features,normalisationData):
 			features[i] = float(features[i])/float(normalisationData[i])
 		i += 1
 	return features
+
+#def trimLIWCinput(liwcvalues):
+	#['WC', 'WPS', 'Sixltr', 'Dic', 'Numerals','funct', 'pronoun', 'ppron', 'i', 'we', 'you', 'shehe', 'they', 'ipron', 'article', 'verb', 'auxverb', 'past', 'present', 'future', 'adverb', 'preps', 'conj', 'negate', 'quant', 'number', 'swear', 'social', 'family', 'friend', 'humans', 'affect', 'posemo', 'negemo', 'anx', 'anger', 'sad', 'cogmech', 'insight', 'cause', 'discrep', 'tentat', 'certain', 'inhib', 'incl', 'excl', 'percept', 'see', 'hear', 'feel', 'bio', 'body', 'health', 'sexual', 'ingest', 'relativ', 'motion', 'space', 'time', 'work', 'achieve', 'leisure', 'home', 'money', 'relig', 'death', 'assent', 'nonfl', 'filler','Period', 'Comma', 'Colon', 'SemiC', 'QMark', 'Exclam', 'Dash', 'Quote', 'Apostro', 'Parenth', 'OtherP', 'AllPct']
+	#return [liwcvalues[3]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]
 
 def writeToCSV(emailId,path,emailData,normalisedData): #This is un-normalised.
 	# INPUT: Unique ID of Email, Location of email, List containing the header values.
