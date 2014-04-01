@@ -23,7 +23,6 @@ __LIWCHEADERS__ = ['WC', 'WPS', 'Sixltr', 'Dic', 'Numerals','funct', 'pronoun', 
 __WEKAHEADERS__ = ["Email_ID","Importance_Statement","Number_of_Recipients","Length_of_Email_Body"] + __LIWCHEADERS__
 __OUTPUT__ = "WEKA"
 
-__CATEGORYMAPPINGLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/IDCategoryMapping.txt"
 __NORMALISED__ = True
 
 def parseEmail(emailPath):
@@ -83,13 +82,8 @@ def determineNumberOfRecipients(recipients):
 	else:
 		return len(parsedRecipients)
 
-def prepareDataForWrite(emailId,path,emailData):
+def prepareDataForWrite(emailId,user,parentFolder,emailData):
 	# Structure of emailData: [Date,Subject,From,To,Body,Cc,Bcc,Re,Origin,Folder,MessageID]
-
-	#Generated info
-	stub = string.split(path,"/")
-	user = stub[7]
-	parentFolder = stub[8]
 
 	recipients = [emailData[3]] + emailData[5:6]
 	numberOfRecipients = determineNumberOfRecipients(recipients)
@@ -111,18 +105,29 @@ def prepareDataForWrite(emailId,path,emailData):
 	return [emailId] + [parentFolder] + [user] + emailData[0:7] + [numberOfRecipients] + [lengthOfEmail] + emailData[10:12] + [importanceStatement]
 
 def normaliseData(features,normalisationData):
-	i=0
+	i = 0
 	while i<len(features):
 		if (float(features[i]) != 0.0):
-			features[i] = float(features[i])/float(normalisationData[i])
+			features[i] = float(str(features[i]))/float(normalisationData[i])
 		i += 1
 	return features
 
-#def trimLIWCinput(liwcvalues):
-	#['WC', 'WPS', 'Sixltr', 'Dic', 'Numerals','funct', 'pronoun', 'ppron', 'i', 'we', 'you', 'shehe', 'they', 'ipron', 'article', 'verb', 'auxverb', 'past', 'present', 'future', 'adverb', 'preps', 'conj', 'negate', 'quant', 'number', 'swear', 'social', 'family', 'friend', 'humans', 'affect', 'posemo', 'negemo', 'anx', 'anger', 'sad', 'cogmech', 'insight', 'cause', 'discrep', 'tentat', 'certain', 'inhib', 'incl', 'excl', 'percept', 'see', 'hear', 'feel', 'bio', 'body', 'health', 'sexual', 'ingest', 'relativ', 'motion', 'space', 'time', 'work', 'achieve', 'leisure', 'home', 'money', 'relig', 'death', 'assent', 'nonfl', 'filler','Period', 'Comma', 'Colon', 'SemiC', 'QMark', 'Exclam', 'Dash', 'Quote', 'Apostro', 'Parenth', 'OtherP', 'AllPct']
-	#return [liwcvalues[3]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]+[liwcvalues[]]
+def writeAllToCSV(emailData):
+	try:
+		results = open(__CSVLOCATION__,'a')
+	except IOError:
+		print "Failed to open csv in: " + __CSVLOCATION__
+	writer = csv.writer(results,dialect='excel')
+	for data in emailData:
+		try: 
+			writer.writerow(data)
+		except:
+			print "Could not write email: " + str(emailId)
+			print data
+			raise
+	results.close
 
-def writeToCSV(emailId,path,emailData,normalisedData): #This is un-normalised.
+def writeToCSV(emailId,user,parentFolder,emailData,normalisedData): #This is un-normalised.
 	# INPUT: Unique ID of Email, Location of email, List containing the header values.
 	# OUTPUT: Writes details to file.
 	try:
@@ -132,7 +137,7 @@ def writeToCSV(emailId,path,emailData,normalisedData): #This is un-normalised.
 	
 	writer = csv.writer(results,dialect='excel')
 
-	preparedData = prepareDataForWrite(emailID,path,emailData)
+	preparedData = prepareDataForWrite(emailID,user,parentFolder,emailData)
 
 	if (__OUTPUT__ == "CSV"):
 		#overwriting 
@@ -147,7 +152,8 @@ def writeToCSV(emailId,path,emailData,normalisedData): #This is un-normalised.
 		#emaildata: [Date,Subject,From,To,Body,Cc,Bcc]
 		preparedData = [preparedData[0]] + [preparedData[-1]] + [preparedData[-5]] + [preparedData[-4]] 
 	
-	sql = loadLIWCData(emailId)
+	#sql = loadLIWCData(emailId)
+	sql = loadJSONOrderedDict(__LIWCDATA__ + str(emailId)).values()
 	if (__NORMALISED__):
 		sql = normaliseData(sql,normalisedData)
 
@@ -180,7 +186,8 @@ def writeToDatabase(emailId,path,emailData,normalisedData):
 	values = tuple(preparedData)
 	db.execute("insert into enron values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",values)
 	
-	sql = loadLIWCData(emailId)
+	#sql = loadLIWCData(emailId)
+	sql = loadJSONOrderedDict(__LIWCDATA__ + str(emailId)).values()
 	if (__NORMALISED__):
 		sql = normaliseData(sql,normalisedData)
 	sql = tuple([emailId]) + tuple(sql)
@@ -193,7 +200,7 @@ def attemptToSet(key,source):
 	# INPUT: key: header key. source: Dictionary of header
 	# OUTPUT: value of that key if exists. "" if doesn't
 	try:
-		headerField = unicode(source[key],'utf-8','replace')
+		headerField = source[key]#unicode(source[key],'utf-8','replace')
 		return headerField
 	except KeyError:
 		headerField = None #unicode("",'utf-8','replace')
@@ -229,23 +236,32 @@ def loadIDMappings():
 	mappings.close()
 	return IDtoImportanceMappings
 
-def loadLIWCData(emailID):
+def loadJSONOrderedDict(filepath):
 	try:
-		liwc = open(__LIWCDATA__ + str(emailID),'r')
+		f = open(filepath,'r')
 	except IOError:
-		print "Failed to open: " + __LIWCDATA__ + str(emailID)
-	data = json.load(liwc, object_pairs_hook=collections.OrderedDict)
-	liwc.close()
-	return data.values()
-
-def loadNormalisedData():
-	try:
-		f = open("/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt",'r')
-	except IOError:
-		print "Failed to open: /Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt"
+		print "Failed to open:" + str(filepath)
 	data = json.load(f, object_pairs_hook=collections.OrderedDict)
 	f.close()
-	return data.values() #max no for each LIWC data
+	return data
+
+# def loadLIWCData(emailID):
+# 	try:
+# 		liwc = open(__LIWCDATA__ + str(emailID),'r')
+# 	except IOError:
+# 		print "Failed to open: " + __LIWCDATA__ + str(emailID)
+# 	data = json.load(liwc, object_pairs_hook=collections.OrderedDict)
+# 	liwc.close()
+# 	return data.values()
+
+# def loadNormalisedData():
+# 	try:
+# 		f = open("/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt",'r')
+# 	except IOError:
+# 		print "Failed to open: /Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt"
+# 	data = json.load(f, object_pairs_hook=collections.OrderedDict)
+# 	f.close()
+# 	return data.values() #max no for each LIWC data
 
 if __name__ == "__main__":
 
@@ -254,28 +270,71 @@ if __name__ == "__main__":
 	elif __OUTPUT__ == "DATABASE":
 		initialiseDatabase()
 
-	importanceMappings = loadIDMappings()
-	minMax = loadNormalisedData()
-	for root, dirs, files in os.walk(__DATASETLOCATION__):
-		if len(files) > 0: #If files actually present
-			for element in files:
+	i = 0
+	output = []
+	importanceMappings = loadJSONOrderedDict("/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/IDCategoryMapping.txt")
+	print "Importance Mappings loaded"
+	minMax = loadJSONOrderedDict("/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt").values()
+	print "Normalisation Data loaded"
+	emails = loadJSONOrderedDict("/Users/James/Documents/Enron Email Corpus/EmailsJSON.json")
+	print "Emails loaded"
+
+	for email in emails.keys():
+		emailID = int(email)
+
+		i += 1
+		if i%1000 == 0:
+			print i
+
+		data = emails.pop(email)
+		user = data['User']
+		parentFolder = data['ParentFolder']
+
+		if (data['Message-ID'] in importanceMappings):
+			data['Importance_Rating'] = str(importanceMappings[data['Message-ID']])
+
+		processedData = processData(data)
+		preparedData = prepareDataForWrite(emailID,user,parentFolder,processedData)
+		#Cutting down to only useful values
+		preparedData = [preparedData[0]] + [preparedData[-1]] + [preparedData[-5]] + [preparedData[-4]] 
+		sql = loadJSONOrderedDict(__LIWCDATA__ + email).values()
+		if (__NORMALISED__):
+			sql = normaliseData(sql,minMax)
+		data = preparedData + sql
+		if (preparedData[-1] is not None):
+			output.append(data)
+
+	writeAllToCSV(output)
+		# if (__OUTPUT__ == "CSV") or (__OUTPUT__ == "WEKA"):
+		# 	writeToCSV(emailID,user,parentFolder,processedData,minMax)
+		# elif __OUTPUT__ == "DATABASE":
+		# 	writeToDatabase(emailID,filePath,processedData,minMax)
+		# elif __OUTPUT__ == "LIWC":
+		# 	writeBodyToFile(emailID,processedData[4])
+
+
+
+	# for root, dirs, files in os.walk(__DATASETLOCATION__):
+	# 	if len(files) > 0: #If files actually present
+	# 		for element in files:
 				
-				emailID = int(element)
-				filePath = root + "/" + element
+	# 			emailID = int(element)
+	# 			filePath = root + "/" + element
 
-				if emailID%1000 == 0: #No of files processed
-					print emailID
+	# 			i += 1
+	# 			if i%1000 == 0:
+	# 				print i
 				
-				data = parseEmail(filePath)
+	# 			data = parseEmail(filePath)
 
-				if (data['Message-ID'] in importanceMappings):
-					data['Importance_Rating'] = str(importanceMappings[data['Message-ID']])
+	# 			if (data['Message-ID'] in importanceMappings):
+	# 				data['Importance_Rating'] = str(importanceMappings[data['Message-ID']])
 
-				processedData = processData(data)
+	# 			processedData = processData(data)
 
-				if (__OUTPUT__ == "CSV") or (__OUTPUT__ == "WEKA"):
-					writeToCSV(emailID,filePath,processedData,minMax)
-				elif __OUTPUT__ == "DATABASE":
-					writeToDatabase(emailID,filePath,processedData,minMax)
-				elif __OUTPUT__ == "LIWC":
-					writeBodyToFile(emailID,processedData[4])
+	# 			if (__OUTPUT__ == "CSV") or (__OUTPUT__ == "WEKA"):
+	# 				writeToCSV(emailID,filePath,processedData,minMax)
+	# 			elif __OUTPUT__ == "DATABASE":
+	# 				writeToDatabase(emailID,filePath,processedData,minMax)
+	# 			elif __OUTPUT__ == "LIWC":
+	# 				writeBodyToFile(emailID,processedData[4])
