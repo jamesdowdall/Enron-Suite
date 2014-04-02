@@ -20,7 +20,7 @@ __DATABASELOCATION__ = "/Users/James/Documents/Enron Email Corpus/Enron.db"
 
 __CSVHEADERS__ = ["Email_ID","Parent_Folder","User","Date","Subject","Email_From","Email_To","Body","Cc","Bcc","Number_of_Recipients","Length_of_Email_Body","Message_ID","Importance_Statement"]#,"FilePath"]
 __LIWCHEADERS__ = ['WC', 'WPS', 'Sixltr', 'Dic', 'Numerals','funct', 'pronoun', 'ppron', 'i', 'we', 'you', 'shehe', 'they', 'ipron', 'article', 'verb', 'auxverb', 'past', 'present', 'future', 'adverb', 'preps', 'conj', 'negate', 'quant', 'number', 'swear', 'social', 'family', 'friend', 'humans', 'affect', 'posemo', 'negemo', 'anx', 'anger', 'sad', 'cogmech', 'insight', 'cause', 'discrep', 'tentat', 'certain', 'inhib', 'incl', 'excl', 'percept', 'see', 'hear', 'feel', 'bio', 'body', 'health', 'sexual', 'ingest', 'relativ', 'motion', 'space', 'time', 'work', 'achieve', 'leisure', 'home', 'money', 'relig', 'death', 'assent', 'nonfl', 'filler','Period', 'Comma', 'Colon', 'SemiC', 'QMark', 'Exclam', 'Dash', 'Quote', 'Apostro', 'Parenth', 'OtherP', 'AllPct']
-__WEKAHEADERS__ = ["Email_ID","Importance_Statement","Number_of_Recipients","Length_of_Email_Body"] + __LIWCHEADERS__
+__WEKAHEADERS__ = ["Email_ID","Importance_Statement","Number_of_Recipients","Length_of_Email_Body","Number_of_Tos","Number_of_Ccs","Number_of_Bccs"] + __LIWCHEADERS__
 __OUTPUT__ = "WEKA"
 
 __NORMALISED__ = True
@@ -75,42 +75,64 @@ def determineNumberOfRecipients(recipients):
 		if field is not None:
 			split = string.split(field,',')
 			for potentialRecipient in split:
-				if (potentialRecipient not in parsedRecipients) and (potentialRecipient != ""):
+				if (potentialRecipient not in parsedRecipients) and (potentialRecipient != ""): #Unique & Not Empty
 					parsedRecipients.append(potentialRecipient)
-	if (__NORMALISED__):
-		return (len(parsedRecipients)/913.0) #max recipients = 913, min = 0
-	else:
-		return len(parsedRecipients)
+	return len(parsedRecipients)
 
 def prepareDataForWrite(emailId,user,parentFolder,emailData):
 	# Structure of emailData: [Date,Subject,From,To,Body,Cc,Bcc,Re,Origin,Folder,MessageID]
 
-	recipients = [emailData[3]] + emailData[5:6]
+	To = [emailData[3]]
+	Cc = [emailData[5]]
+	Bcc = [emailData[6]]
+	recipients = To + Cc + Bcc
 	numberOfRecipients = determineNumberOfRecipients(recipients)
+	numberOfTos = determineNumberOfRecipients(To)
+	numberOfCcs = determineNumberOfRecipients(Cc)
+	numberOfBccs = determineNumberOfRecipients(Bcc)
 	
-	if (__NORMALISED__):
-		lengthOfEmail = (len(emailData[4])-1.0)/2011421.0 #Max email length = 2011422, min = 1
-	else:
-		lengthOfEmail = len(emailData[4])
+	lengthOfEmail = len(emailData[4])
 
 	if emailData[11] is None: #This needs to be changed to be more statistically correct.
 		importanceStatement = None
-	elif float(emailData[11]) < 0.76:
+	elif float(emailData[11]) < 0.75:
 		importanceStatement = "Non Important"
-	elif float(emailData[11]) >= 0.76:
+	elif float(emailData[11]) >= 0.75:
 		importanceStatement = "Important"
 	else:
 		importanceStatement = "Neutrally Important"
 
-	return [emailId] + [parentFolder] + [user] + emailData[0:7] + [numberOfRecipients] + [lengthOfEmail] + emailData[10:12] + [importanceStatement]
+	#emailData[0:7] = [Date,Subject,From,To,Body,Cc,Bcc]
+	#emailData[10:12] = [MessageID,ImportanceRating]
+	return [emailId] + [parentFolder] + [user] + emailData[0:7] + [numberOfRecipients] + [lengthOfEmail] + emailData[10:12] + [importanceStatement] + [numberOfTos] + [numberOfCcs] + [numberOfBccs]
 
-def normaliseData(features,normalisationData):
+def normaliseLIWC(features,normalisationData):
 	i = 0
 	while i<len(features):
 		if (float(features[i]) != 0.0):
 			features[i] = float(str(features[i]))/float(normalisationData[i])
 		i += 1
 	return features
+
+def normaliseResults(results, lower, upper):
+	#INPUT: Results - List of lists containing values, lower = lower bound values, upper = upper values
+	i = 0
+	upperminuslower = []
+	while i < len(lower):
+		upperminuslower.append(upper[i] - lower[i])
+		i += 1
+
+	for result in results:
+		j = 2
+		#print result
+		while j < len(result):
+			if upperminuslower[j-2] == 0.0: #If denom is 0
+				result[j] = 0.0
+			else: 
+				result[j] = (float(result[j]) - lower[j-2])/upperminuslower[j-2]
+			j += 1 
+
+	return results
 
 def writeAllToCSV(emailData):
 	try:
@@ -127,45 +149,48 @@ def writeAllToCSV(emailData):
 			raise
 	results.close
 
-def writeToCSV(emailId,user,parentFolder,emailData,normalisedData): #This is un-normalised.
-	# INPUT: Unique ID of Email, Location of email, List containing the header values.
-	# OUTPUT: Writes details to file.
-	try:
-		results = open(__CSVLOCATION__,'a')
-	except IOError:
-		print "Failed to open csv in: " + __CSVLOCATION__
+# def writeToCSV(emailId,user,parentFolder,emailData,normalisedData): #This is un-normalised.
+# 	# INPUT: Unique ID of Email, Location of email, List containing the header values.
+# 	# OUTPUT: Writes details to file.
+# 	try:
+# 		results = open(__CSVLOCATION__,'a')
+# 	except IOError:
+# 		print "Failed to open csv in: " + __CSVLOCATION__
 	
-	writer = csv.writer(results,dialect='excel')
+# 	writer = csv.writer(results,dialect='excel')
 
-	preparedData = prepareDataForWrite(emailID,user,parentFolder,emailData)
+# 	preparedData = prepareDataForWrite(emailID,user,parentFolder,emailData)
 
-	if (__OUTPUT__ == "CSV"):
-		#overwriting 
-		preparedData[4] = None
-		preparedData[5] = None
-		preparedData[6] = None
-		preparedData[7] = None
-		preparedData[8] = None
-		preparedData[9] = None
+# 	if (__OUTPUT__ == "CSV"):
+# 		#overwriting 
+# 		preparedData[4] = None
+# 		preparedData[5] = None
+# 		preparedData[6] = None
+# 		preparedData[7] = None
+# 		preparedData[8] = None
+# 		preparedData[9] = None
 
-	elif (__OUTPUT__ == "WEKA"):
-		#emaildata: [Date,Subject,From,To,Body,Cc,Bcc]
-		preparedData = [preparedData[0]] + [preparedData[-1]] + [preparedData[-5]] + [preparedData[-4]] 
+# 	elif (__OUTPUT__ == "WEKA"):
+# 		#emaildata: [Date,Subject,From,To,Body,Cc,Bcc]
+# 		print len(preparedData)
+# 		#preparedData = [preparedData[0]] + [preparedData[-1]] + [preparedData[-5]] + [preparedData[-4]]
+# 		#EmailID, Importance Statement, Number of Recipients, Email Length 
+# 		preparedData = [preparedData[0]] + [preparedData[14]] + [preparedData[10]] + [preparedData[11]] 
 	
-	#sql = loadLIWCData(emailId)
-	sql = loadJSONOrderedDict(__LIWCDATA__ + str(emailId)).values()
-	if (__NORMALISED__):
-		sql = normaliseData(sql,normalisedData)
 
-	data = preparedData + sql
-	if (preparedData[-1] is not None):
-		try: 
-			writer.writerow(data)
-		except:
-			print "Could not write email: " + str(emailId)
-			print data
-			raise
-	results.close
+# 	sql = loadJSONOrderedDict(__LIWCDATA__ + str(emailId)).values()
+# 	if (__NORMALISED__):
+# 		sql = normaliseLIWC(sql,normalisedData)
+
+# 	data = preparedData + sql
+# 	if (preparedData[-1] is not None):
+# 		try: 
+# 			writer.writerow(data)
+# 		except:
+# 			print "Could not write email: " + str(emailId)
+# 			print data
+# 			raise
+# 	results.close
 
 def writeBodyToFile(emailID,body):
 	# INPUT: Headers list [Date,Subject,From,To,Body,Cc,Bcc,Attachment,Re,Origin,Folder]
@@ -189,7 +214,7 @@ def writeToDatabase(emailId,path,emailData,normalisedData):
 	#sql = loadLIWCData(emailId)
 	sql = loadJSONOrderedDict(__LIWCDATA__ + str(emailId)).values()
 	if (__NORMALISED__):
-		sql = normaliseData(sql,normalisedData)
+		sql = normaliseLIWC(sql,normalisedData)
 	sql = tuple([emailId]) + tuple(sql)
 	db.execute("insert into LIWC values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",sql)
 	
@@ -206,7 +231,7 @@ def attemptToSet(key,source):
 		headerField = None #unicode("",'utf-8','replace')
 		return headerField
 
-def processData(headerList):
+def processData(headerList): #This can probably be improved 
 	# INPUT: Dictionary of headers
 	# OUTPUT: Ordered list of header values
 	Date = attemptToSet('Date',headerList)
@@ -245,24 +270,6 @@ def loadJSONOrderedDict(filepath):
 	f.close()
 	return data
 
-# def loadLIWCData(emailID):
-# 	try:
-# 		liwc = open(__LIWCDATA__ + str(emailID),'r')
-# 	except IOError:
-# 		print "Failed to open: " + __LIWCDATA__ + str(emailID)
-# 	data = json.load(liwc, object_pairs_hook=collections.OrderedDict)
-# 	liwc.close()
-# 	return data.values()
-
-# def loadNormalisedData():
-# 	try:
-# 		f = open("/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt",'r')
-# 	except IOError:
-# 		print "Failed to open: /Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt"
-# 	data = json.load(f, object_pairs_hook=collections.OrderedDict)
-# 	f.close()
-# 	return data.values() #max no for each LIWC data
-
 if __name__ == "__main__":
 
 	if (__OUTPUT__ == "CSV") or (__OUTPUT__ == "WEKA"):
@@ -270,49 +277,90 @@ if __name__ == "__main__":
 	elif __OUTPUT__ == "DATABASE":
 		initialiseDatabase()
 
-	i = 0
+	
 	output = []
+	#ANLP Category Data
 	importanceMappings = loadJSONOrderedDict("/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/IDCategoryMapping.txt")
 	print "Importance Mappings loaded"
-	minMax = loadJSONOrderedDict("/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/MinMax.txt").values()
-	print "Normalisation Data loaded"
+	
+	#All Emails
 	emails = loadJSONOrderedDict("/Users/James/Documents/Enron Email Corpus/EmailsJSON.json")
 	print "Emails loaded"
 
+	#Selection Criteria
+	i = 0
+	emailSelection = []
+	print "Checking Criteria"
 	for email in emails.keys():
+		i += 1
+		if i%5000 == 0:
+			print i
+
+		data = emails[email]
+		
+		#If email is in ANLP dataset
+		if (data['Message-ID'] in importanceMappings):
+			emailSelection.append(email)
+
+	#emails could be thrown out here
+
+	i = 0
+	print "Processing Selected Emails"
+	minimum = []
+	maximum = []
+	for email in emailSelection:
 		emailID = int(email)
 
 		i += 1
-		if i%1000 == 0:
+		if i%500 == 0:
 			print i
 
-		data = emails.pop(email)
+		data = emails.pop(str(email))
 		user = data['User']
 		parentFolder = data['ParentFolder']
-
-		if (data['Message-ID'] in importanceMappings):
-			data['Importance_Rating'] = str(importanceMappings[data['Message-ID']])
+		
+		#Assign Importance Rating. Don't have to check for existance as this is checked above.
+		data['Importance_Rating'] = str(importanceMappings[data['Message-ID']])
 
 		processedData = processData(data)
 		preparedData = prepareDataForWrite(emailID,user,parentFolder,processedData)
+
 		#Cutting down to only useful values
-		preparedData = [preparedData[0]] + [preparedData[-1]] + [preparedData[-5]] + [preparedData[-4]] 
+		#EmailID, Importance Statement, Number or Recipients, Email Length, Number of Tos, Number of Ccs, Number of Bccs
+		preparedData = [preparedData[0]] + [preparedData[14]] + [preparedData[10]] + [preparedData[11]] + [preparedData[15]] + [preparedData[16]] + [preparedData[17]] 
+		
+		#Loading LIWC values for this email
 		sql = loadJSONOrderedDict(__LIWCDATA__ + email).values()
-		if (__NORMALISED__):
-			sql = normaliseData(sql,minMax)
+		
+		#Assembling write string
 		data = preparedData + sql
-		if (preparedData[-1] is not None):
-			output.append(data)
 
+		if (__NORMALISED__):#Ensure min & max are correct length & full of unlikely values
+			while (len(minimum) < (len(data)-2)):
+				minimum.append(100.0)
+				maximum.append(0.0)
+
+			j = 2 #Ignore emailID & Importance Statement
+			while j<len(data):
+				if float(str(data[j])) < minimum[j-2]:
+					minimum[j-2] = float(str(data[j]))
+				elif float(str(data[j])) > maximum[j-2]:
+					maximum[j-2] = float(str(data[j]))
+				j += 1
+		
+		output.append(data)
+
+	#del emails
+	#del importanceMappings
+
+	if (__NORMALISED__):
+		print "Normalising Data"
+		#print minimum
+		#print maximum
+		output = normaliseResults(output, minimum, maximum)
+
+	print "Writing to CSV"
 	writeAllToCSV(output)
-		# if (__OUTPUT__ == "CSV") or (__OUTPUT__ == "WEKA"):
-		# 	writeToCSV(emailID,user,parentFolder,processedData,minMax)
-		# elif __OUTPUT__ == "DATABASE":
-		# 	writeToDatabase(emailID,filePath,processedData,minMax)
-		# elif __OUTPUT__ == "LIWC":
-		# 	writeBodyToFile(emailID,processedData[4])
-
-
 
 	# for root, dirs, files in os.walk(__DATASETLOCATION__):
 	# 	if len(files) > 0: #If files actually present
