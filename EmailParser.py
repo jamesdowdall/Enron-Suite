@@ -11,6 +11,7 @@ import collections
 __DATASETLOCATION__ = "/Users/James/Documents/Enron Email Corpus/Edited Enron Email Dataset/maildir/"
 __RESULTLOCATION__ = "/Users/James/Dropbox/Final Year Project/Technical Investigations/Analysis Scripts/"
 __CSVLOCATION__ = __RESULTLOCATION__ + "EnronData.csv"
+__JSONLOCATION__ = __RESULTLOCATION__ + "EnronData.json"
 
 __LIWC__ = "/Users/James/Documents/Enron Email Corpus/LIWC/"
 __BODYOUTPUT__ = __LIWC__ + "Input/"
@@ -261,6 +262,14 @@ def loadIDMappings():
 	mappings.close()
 	return IDtoImportanceMappings
 
+def writeResultsJSON(results,filepath):
+	try:
+		f = open(filepath,'w')
+	except IOError:
+		print "Failed to open: " + str(filepath)
+	json.dump(results,f)
+	f.close()
+
 def loadJSONOrderedDict(filepath):
 	try:
 		f = open(filepath,'r')
@@ -289,33 +298,35 @@ if __name__ == "__main__":
 
 	#Selection Criteria
 	i = 0
-	emailSelection = []
+	emailSelection = {}
 	print "Checking Criteria"
 	for email in emails.keys():
 		i += 1
 		if i%5000 == 0:
 			print i
 
-		data = emails[email]
+		#data = emails[email]
+		data = emails.pop(email)
 		
 		#If email is in ANLP dataset
 		if (data['Message-ID'] in importanceMappings):
-			emailSelection.append(email)
+			emailSelection[email] = data
 
+	del emails
 	#emails could be thrown out here
 
 	i = 0
 	print "Processing Selected Emails"
 	minimum = []
 	maximum = []
-	for email in emailSelection:
+	for email in emailSelection.keys():
 		emailID = int(email)
 
 		i += 1
 		if i%500 == 0:
 			print i
 
-		data = emails.pop(str(email))
+		data = emailSelection[email]
 		user = data['User']
 		parentFolder = data['ParentFolder']
 		
@@ -350,9 +361,6 @@ if __name__ == "__main__":
 		
 		output.append(data)
 
-	#del emails
-	#del importanceMappings
-
 	if (__NORMALISED__):
 		print "Normalising Data"
 		#print minimum
@@ -361,6 +369,8 @@ if __name__ == "__main__":
 
 	print "Writing to CSV"
 	writeAllToCSV(output)
+	print "Writing to JSON"
+
 
 	# for root, dirs, files in os.walk(__DATASETLOCATION__):
 	# 	if len(files) > 0: #If files actually present
