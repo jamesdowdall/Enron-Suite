@@ -285,7 +285,6 @@ if __name__ == "__main__":
 		initialiseCSV()
 	elif __OUTPUT__ == "DATABASE":
 		initialiseDatabase()
-
 	
 	output = []
 	#ANLP Category Data
@@ -298,7 +297,7 @@ if __name__ == "__main__":
 
 	#Selection Criteria
 	i = 0
-	emailSelection = {}
+	emailSelection = collections.OrderedDict()
 	print "Checking Criteria"
 	for email in emails.keys():
 		i += 1
