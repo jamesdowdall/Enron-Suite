@@ -96,9 +96,9 @@ def prepareDataForWrite(emailId,user,parentFolder,emailData):
 
 	if emailData[11] is None: #This needs to be changed to be more statistically correct.
 		importanceStatement = None
-	elif float(emailData[11]) < 0.75:
+	elif float(emailData[11]) <= 0.75:
 		importanceStatement = "Non Important"
-	elif float(emailData[11]) >= 0.75:
+	elif float(emailData[11]) > 0.75:
 		importanceStatement = "Important"
 	else:
 		importanceStatement = "Neutrally Important"
@@ -304,7 +304,6 @@ if __name__ == "__main__":
 		if i%5000 == 0:
 			print i
 
-		#data = emails[email]
 		data = emails.pop(email)
 		
 		#If email is in ANLP dataset
